@@ -23,6 +23,7 @@
 
 ## Bugfixes
 * veneur-prometheus now reports incremental counters instead of cumulative counters. This may cause dramatic differences in the statistics reported by veneur-prometheus.  Thanks, [kklipsch-stripe](https://github.com/kklipsch-stripe)!
+* fetch signalfx org tokens using a session token rather than using an org token.
 
 ## Bugfixes
 * Veneur listening on UDS for statsd metrics will respect the `read_buffer_size_bytes` config. Thanks, [prudhvi](https://github.com/prudhvi)!

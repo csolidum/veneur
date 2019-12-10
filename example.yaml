@@ -350,6 +350,14 @@ signalfx_flush_max_per_body: 0
 # so it must be set for this to work properly.
 signalfx_dynamic_per_tag_api_keys_enable: false
 
+# Email for a SignalFx account. This is needed if signalfx_dynamic_per_tag_api_keys_enabed
+# is set to true, in order to create a session token for fetching org tokens.
+signalfx_email: ""
+
+# Password for SignalFx account. This is needed if signalfx_dynamic_per_tag_api_keys_enabled
+# is set to true, in order to create a session token for fetching org tokens.
+signalfx_password: ""
+
 # The period of the polling performed on SignalFX to fetch dynamic
 # tokens. This only matters if signalfx_dynamic_per_tag_api_keys_enable
 # is true. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
