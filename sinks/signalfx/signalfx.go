@@ -204,6 +204,11 @@ func NewSignalFxSink(hostnameTag string, hostname string, commonDimensions map[s
 		}
 	}
 
+	// Check that email/pass is supplied if using dynampic per tag tokens
+	if enableDynamicPerTagTokens && (email == "" || password == "") {
+		return nil, errors.Wrap(err, "signalfx_email and signalfx_password need to be supplied if dynamic per tag tokens is enabled")
+	}
+
 	return &SignalFxSink{
 		defaultClient:             client,
 		clientsByTagValueMu:       &sync.RWMutex{},
