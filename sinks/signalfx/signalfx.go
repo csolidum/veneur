@@ -33,6 +33,8 @@ var eventURL *url.URL
 const (
 	datapointAddr string = "/v2/datapoint"
 	eventAddr     string = "/v2/event"
+	tokenAddr     string = "/v2/token"
+	sessionAddr   string = "/v2/session"
 )
 
 func init() {
@@ -157,6 +159,8 @@ type SignalFxSink struct {
 	maxPointsInBatch          int
 	metricsEndpoint           string
 	apiEndpoint               string
+	email                     string
+	password                  string
 	httpClient                *http.Client
 }
 
@@ -180,19 +184,29 @@ func NewClient(endpoint, apiKey string, client *http.Client) DPClient {
 }
 
 // NewSignalFxSink creates a new SignalFx sink for metrics.
-func NewSignalFxSink(hostnameTag string, hostname string, commonDimensions map[string]string, log *logrus.Logger, client DPClient, varyBy string, perTagClients map[string]DPClient, metricNamePrefixDrops []string, metricTagPrefixDrops []string, derivedMetrics samplers.DerivedMetricsProcessor, maxPointsInBatch int, defaultToken string, enableDynamicPerTagTokens bool, dynamicKeyRefreshPeriod time.Duration, metricsEndpoint string, apiEndpoint string, httpClient *http.Client) (*SignalFxSink, error) {
+func NewSignalFxSink(hostnameTag string, hostname string, commonDimensions map[string]string, log *logrus.Logger, client DPClient, varyBy string, perTagClients map[string]DPClient, metricNamePrefixDrops []string, metricTagPrefixDrops []string, derivedMetrics samplers.DerivedMetricsProcessor, maxPointsInBatch int, defaultToken string, enableDynamicPerTagTokens bool, dynamicKeyRefreshPeriod time.Duration, metricsEndpoint string, apiEndpoint string, email string, password string, httpClient *http.Client) (*SignalFxSink, error) {
 	var endpointStr string
 	if apiEndpoint != "" {
 		endpoint, err := url.Parse(apiEndpoint)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to parse signalfx api endpoint")
 		}
+		endpointStr = endpoint.String()
 
-		endpoint, err = endpoint.Parse("/v2/token")
+		// Check that the various api methods are valid url addresses
+		_, err = endpoint.Parse(tokenAddr)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to generate signalfx token endpoint")
 		}
-		endpointStr = endpoint.String()
+		_, err = endpoint.Parse(sessionAddr)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to generate signalfx session endpoint")
+		}
+	}
+
+	// Check that email/pass is supplied if using dynampic per tag tokens
+	if enableDynamicPerTagTokens && (email == "" || password == "") {
+		return nil, errors.Wrap(err, "signalfx_email and signalfx_password need to be supplied if dynamic per tag tokens is enabled")
 	}
 
 	return &SignalFxSink{
@@ -213,6 +227,8 @@ func NewSignalFxSink(hostnameTag string, hostname string, commonDimensions map[s
 		maxPointsInBatch:          maxPointsInBatch,
 		metricsEndpoint:           metricsEndpoint,
 		apiEndpoint:               endpointStr,
+		email:                     email,
+		password:                  password,
 		httpClient:                httpClient,
 	}, nil
 }
@@ -250,7 +266,12 @@ func (sfx *SignalFxSink) clientByTagUpdater() {
 
 	ticker := time.NewTicker(sfx.dynamicKeyRefreshPeriod)
 	for range ticker.C {
-		tokens, err := fetchAPIKeys(sfx.httpClient, sfx.apiEndpoint, sfx.defaultToken)
+		sessionToken, err := getSessionToken(sfx.httpClient, sfx.apiEndpoint, sfx.email, sfx.password)
+		if err != nil {
+			sfx.log.WithError(err).Warn("Failed to create session token, Failed to fetch org tokens from SignalFX")
+			continue
+		}
+		tokens, err := fetchAPIKeys(sfx.httpClient, sfx.apiEndpoint, sessionToken)
 		if err != nil {
 			sfx.log.WithError(err).Warn("Failed to fetch new tokens from SignalFX")
 			continue
@@ -272,6 +293,41 @@ const (
 
 	limitQueryValue = 200
 )
+
+func getSessionToken(client *http.Client, endpoint, email, password string) (string, error) {
+	sessionEndpoint := endpoint + sessionAddr
+
+	jsonBody := []byte(fmt.Sprintf("{\"email\": \"%s\", \"password\": \"%s\"}", email, password))
+	resp, err := client.Post(sessionEndpoint, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return "", fmt.Errorf("invalid credentials when generating session token")
+	} else if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("signalfx api returned unknown response code when generating session: %s", resp.Status)
+	}
+
+	body := &bytes.Buffer{}
+	_, err = body.ReadFrom(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var createSessionResponse = make(map[string]interface{})
+	err = json.Unmarshal(body.Bytes(), &createSessionResponse)
+	if err != nil {
+		return "", err
+	}
+
+	accessToken, ok := createSessionResponse["accessToken"].(string)
+	if !ok {
+		return "", fmt.Errorf("No access token returned when creating session")
+	}
+	return accessToken, nil
+}
 
 func getTokensApiResponseFromOffset(client *http.Client, endpoint, apiToken string, offset int) (*bytes.Buffer, error) {
 	b := &bytes.Buffer{}
@@ -315,13 +371,14 @@ func getTokensApiResponseFromOffset(client *http.Client, endpoint, apiToken stri
 }
 
 func fetchAPIKeys(client *http.Client, endpoint, apiToken string) (map[string]string, error) {
+	tokenEndpoint := endpoint + tokenAddr
+
 	allFetched := false
 	offset := 0
 
 	apiTokensByName := make(map[string]string)
-
 	for !allFetched {
-		body, err := getTokensApiResponseFromOffset(client, endpoint, apiToken, offset)
+		body, err := getTokensApiResponseFromOffset(client, tokenEndpoint, apiToken, offset)
 		if err != nil {
 			return nil, err
 		}

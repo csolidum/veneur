@@ -346,9 +346,19 @@ signalfx_flush_max_per_body: 0
 # list on name collision. The name of the key specified in SignalFX will
 # be used as the name. signalfx_api_key is the fallback key used to submit
 # metrics if signalfx_vary_key_by doesn't match any of the dynamic API
-# keys' names. signalfx_api_key is used to fetch the API keys from SignalFx,
-# so it must be set for this to work properly.
+# keys' names. signalfx_email and signalfx_password are used to create a
+# a session token, so those fields need to be set in order for this to
+# work properly. More information on session and org tokens can be found
+# [here](https://developers.signalfx.com/administration/access_tokens_overview.html#_org_token_security)
 signalfx_dynamic_per_tag_api_keys_enable: false
+
+# Email for a SignalFx account. This is needed if signalfx_dynamic_per_tag_api_keys_enable
+# is set to true, in order to create a session token for fetching org tokens.
+signalfx_email: ""
+
+# Password for SignalFx account. This is needed if signalfx_dynamic_per_tag_api_keys_enable
+# is set to true, in order to create a session token for fetching org tokens.
+signalfx_password: ""
 
 # The period of the polling performed on SignalFX to fetch dynamic
 # tokens. This only matters if signalfx_dynamic_per_tag_api_keys_enable

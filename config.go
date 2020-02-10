@@ -65,12 +65,14 @@ type Config struct {
 	SignalfxAPIKey                            string    `yaml:"signalfx_api_key"`
 	SignalfxDynamicPerTagAPIKeysEnable        bool      `yaml:"signalfx_dynamic_per_tag_api_keys_enable"`
 	SignalfxDynamicPerTagAPIKeysRefreshPeriod string    `yaml:"signalfx_dynamic_per_tag_api_keys_refresh_period"`
+	SignalfxEmail                             string    `yaml:"signalfx_email"`
 	SignalfxEndpointAPI                       string    `yaml:"signalfx_endpoint_api"`
 	SignalfxEndpointBase                      string    `yaml:"signalfx_endpoint_base"`
 	SignalfxFlushMaxPerBody                   int       `yaml:"signalfx_flush_max_per_body"`
 	SignalfxHostnameTag                       string    `yaml:"signalfx_hostname_tag"`
 	SignalfxMetricNamePrefixDrops             []string  `yaml:"signalfx_metric_name_prefix_drops"`
 	SignalfxMetricTagPrefixDrops              []string  `yaml:"signalfx_metric_tag_prefix_drops"`
+	SignalfxPassword                          string    `yaml:"signalfx_password"`
 	SignalfxPerTagAPIKeys                     []struct {
 		APIKey string `yaml:"api_key"`
 		Name   string `yaml:"name"`
